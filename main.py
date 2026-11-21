@@ -41,12 +41,18 @@ def main():
     if width > MAX_DIM or height > MAX_DIM:
         fail(f"entry.png is {width}x{height}, over the {MAX_DIM}x{MAX_DIM} limit")
 
-    # 4. Integrity: the bundled image must match its known hash.
+    # 4. Completeness: a whole PNG ends with the IEND chunk (4-byte
+    #    zero length, the ASCII type IEND, and its 4-byte CRC).
+    if len(data) < 12 or data[-12:-8] != b"\x00\x00\x00\x00" \
+            or data[-8:-4] != b"IEND":
+        fail("entry.png does not end with a complete IEND chunk")
+
+    # 5. Integrity: the bundled image must match its known hash.
     digest = hashlib.sha256(data).hexdigest()
     if digest != EXPECTED_SHA256:
         fail(f"entry.png sha256 mismatch: got {digest}")
 
-    # 5. Write the output (create the directory if needed; never
+    # 6. Write the output (create the directory if needed; never
     #    delete the directory itself or its other contents).
     output_dir = os.environ.get("MAKEFUN_OUTPUT_DIR", "/output")
     os.makedirs(output_dir, exist_ok=True)
@@ -54,7 +60,7 @@ def main():
     with open(output_path, "wb") as handle:
         handle.write(data)
 
-    # 6. Verify the output is byte-identical.
+    # 7. Verify the output is byte-identical.
     with open(output_path, "rb") as handle:
         written = handle.read()
     if hashlib.sha256(written).hexdigest() != EXPECTED_SHA256:
